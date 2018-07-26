@@ -23,6 +23,7 @@ bool paused = false;
 bool req_draw = false;
 vector<int> SplitArg(const string arg, const char delim=':');
 string FindLastFile();
+//string ReadGroupLabel();
 int JumpFrame(int fr);
 int JumpFrameRel(int move);
 void SaveFrame();
@@ -113,15 +114,10 @@ int main(int argc, char** argv)
 
    Mat frame_cap;
    Mat frame_sum;
-   if (fr_2 >= 0) {
-      paused = true;
-      req_draw = true;
-      SumFrames(&frame_sum, fr_1, fr_2);
-   }
-   
    int i_fr_pre = -1;
    bool auto_diff = false;
-   bool do_loop = true;
+   bool do_loop   = true;
+   bool sum_mode  = false;
    while (do_loop) {
       //if (fr_2 >= 0) { // In the sum mode
       //   frame = frame_sum.clone();
@@ -138,8 +134,8 @@ int main(int argc, char** argv)
          req_draw = true;
       }
       if (req_draw) {
-         if (fr_2 >= 0) frame_draw = frame_sum.clone();
-         else           frame_draw = frame_cap.clone();
+         if (sum_mode) frame_draw = frame_sum.clone();
+         else          frame_draw = frame_cap.clone();
          DrawRect(&frame_draw);
          imshow(win_name, frame_draw);
          setTrackbarPos(name_trk, win_name, i_fr);
@@ -176,24 +172,26 @@ int main(int argc, char** argv)
       case '1':
          cout << "Start frame for summing up = " << i_fr << ".\n";
          fr_1 = i_fr;
-         fr_2 = -1;
          break;
       case '2':
-         if (fr_1 < 0) {
-            cout << "Cannot set the end frame for summing up.  Select a start frame first." << endl;
+         cout << "End frame for summing up = " << i_fr << ".\n";
+         fr_2 = i_fr;
+         break;
+      case '3':
+         cout << "Enter the summing-up mode.\n";
+         if (fr_1 < 0 || fr_2 < 0) {
+            cout << "  Actually not possible.  Set both the start & end frames.\n";
          } else {
-            cout << "End frame for summing up = " << i_fr << ".\n"
-                 << "Enter the summing-up mode.  Hit '3' to exit it." << endl;
-            fr_2 = i_fr;
-            paused = true;
             req_draw = true;
+            sum_mode = true;
             SumFrames(&frame_sum, fr_1, fr_2);
             i_fr_pre = i_fr = fr_2;
          }
          break;
-      case '3':
-         cout << "Reset frames for summing up" << endl;
-         fr_1 = fr_2 = -1;
+      case '4':
+         cout << "Exit the summing-up mode.\n";
+         sum_mode = false;
+         //fr_1 = fr_2 = -1;
          break;
       case 'c':
          if (sel1.x < 0) {
@@ -214,7 +212,7 @@ int main(int argc, char** argv)
          do_loop = false;
          break;
       default:
-         if (! paused && i_fr < n_fr - 1) i_fr++;
+         if (! paused && ! sum_mode && i_fr < n_fr - 1) i_fr++;
          break;
       }
    }
@@ -247,6 +245,18 @@ string FindLastFile()
    }
    return "";
 }
+
+//string ReadGroupLabel()
+//{
+//   ostringstream oss;
+//   oss << getenv("HOME") << "/.b3exp.conf";
+//   ifstream ifs(oss.str().c_str());
+//   if (ifs.is_open()) return "";
+//   string label;
+//   ifs >> label;
+//   ifs.close();
+//   return label;
+//}
 
 int JumpFrame(int fr)
 {
