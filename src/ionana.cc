@@ -18,6 +18,7 @@ Point cut1 = Point(-1, -1), cut2 = Point(-1, -1); /// region to be cut out
 int n_fr;
 int i_fr = 0;
 int fr_1 = -1, fr_2 = -1; /// range for summing up
+int pix_slide = 2; // pixels per frame slided in the summing-up mode
 Mat frame_draw;
 bool paused = false;
 bool req_draw = false;
@@ -39,10 +40,13 @@ int main(int argc, char** argv)
    string fname = "";
    int opt;
    vector<int> values;
-   while ((opt = getopt(argc, argv, "vi:f:c:")) != -1) {
+   while ((opt = getopt(argc, argv, "vl:i:f:c:")) != -1) {
       switch (opt) {
       case 'v':
          verb = 1;
+         break;
+      case 'l':
+         pix_slide = atoi(optarg);
          break;
       case 'i':
          fname = optarg;
@@ -327,7 +331,7 @@ void MouseHandler(int event, int x, int y, int flags, void* param)
 void PosTrackerHandler(int val, void* param)
 {
    if (val != i_fr) {
-      paused = true;
+      //paused = true;
       JumpFrame(val);
    }
 }
@@ -398,8 +402,7 @@ void SumFrames(Mat* fr, int fr_1, int fr_2)
       dx2 = frame_raw.cols;
       dy2 = frame_raw.rows;
    }
-   const int step = 2;
-   *fr = Mat::zeros(Size(dx2 + 100 + step*(fr_2-fr_1), dy2), frame_raw.type());
+   *fr = Mat::zeros(Size(dx2 + 100 + pix_slide*(fr_2-fr_1), dy2), frame_raw.type());
    TakeDiffAuto(&frame_raw, true);
 
    for (int i_fr = fr_1 + 1; i_fr <= fr_2; i_fr++) {
@@ -410,13 +413,13 @@ void SumFrames(Mat* fr, int fr_1, int fr_2)
       TakeDiffAuto(&frame_raw);
       
       Mat frame_mod = Mat::zeros(fr->size(), fr->type());
-      int sx = step * (i_fr - fr_1);
+      int sx = pix_slide * (i_fr - fr_1);
       frame_raw(Rect(xx2, yy2, dx2, dy2)).copyTo(frame_mod(Rect(sx, 0, dx2, dy2)));
       addWeighted(frame_mod, 1.0, *fr, 1.0, 0.0, *fr);
    }
    if (use_gray) cvtColor(*fr, *fr, CV_GRAY2BGR);
       //// old version
-      //int sx  = step * (i_fr - (fr_1 + fr_2) / 2);
+      //int sx  = pix_slide * (i_fr - (fr_1 + fr_2) / 2);
       //if (sx > 0) frame_raw(Rect(  0, 0, xx-sx, yy)).copyTo(frame_mod(Rect(sx, 0, xx-sx, yy)));
       //else        frame_raw(Rect(-sx, 0, xx+sx, yy)).copyTo(frame_mod(Rect( 0, 0, xx+sx, yy)));
       //if (cut1.x >= 0) {
