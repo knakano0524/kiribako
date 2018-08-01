@@ -1,5 +1,6 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
 #include <sstream>
 #include <ctime>
@@ -9,6 +10,7 @@ using namespace cv;
 using namespace std;
 const int dev_num = 0;
 const int fps = 15;
+const int scale = 2; // Resizing factor.  Applied for only display, not recording.
 
 void SetControl(CHandle handle, CControlId id, int value_new);
 
@@ -73,10 +75,10 @@ int main(int, char**)
       Mat frame_raw;
       cap >> frame_raw;
       frame_raw(Rect(x0, y0, rec_size.width, rec_size.height)).copyTo(frame_now(Rect(0, 0, rec_size.width, rec_size.height)));
-      
+
       Mat frame;
       if (! take_diff) {
-         frame = frame_now;
+	frame = frame_now.clone(); // = frame_now;
       } else {
          if (frame_pre.rows == 0) {
             frame_pre = frame_now.clone();
@@ -85,7 +87,7 @@ int main(int, char**)
          absdiff(frame_pre, frame_now, frame);
          frame_pre = frame_now.clone();
       }
-      
+
       time_t utime = time(0);
       tm* ltime = localtime(&utime);
       //string ts = asctime(ltime);
@@ -97,11 +99,13 @@ int main(int, char**)
                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1.0,
                    CV_AA);
       
-      imshow("frame", frame);
       if (do_record) {
          writer << frame;
          fr++;
       }
+      if (scale != 1) resize(frame, frame, Size(), scale, scale);
+      imshow("frame", frame);
+      
       gettimeofday(&time1, NULL);
       int time_w = (int)round(1000.0/fps - 1e3*(time1.tv_sec - time0.tv_sec) - 1e-3*(time1.tv_usec - time0.tv_usec));
       if (time_w <= 0) {
@@ -135,7 +139,8 @@ int main(int, char**)
          break;
       }
    }
-   
+
+   writer.release();
    c_close_device(handle);
    c_cleanup();
    
