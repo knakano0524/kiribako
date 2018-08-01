@@ -1,7 +1,8 @@
-BIN = kireco kirana ionreco ionana
+BIN_K = kireco kirana
+BIN_I = ionreco ionana
 
 .PHONY: all
-all: $(BIN)
+all: $(BIN_K) $(BIN_I)
 
 kireco: kireco.o
 	g++ -O3 -Wall -o $@ $< `pkg-config --libs opencv` -lwebcam
@@ -18,12 +19,14 @@ ionana: ionana.o
 .cc.o:
 	g++ -O3 -Wall -o $@ -c $< `pkg-config --cflags opencv`
 
-.PHONY: install clean
-install: $(BIN)
+.PHONY: install install-k install-i clean
+install: install-k install-i
+install-k: $(BIN_K)
 	cp -a $^ ../
-
+install-i: $(BIN_I)
+	cp -a $^ ../
 clean:
-	rm -f $(BIN) *.o
+	rm -f $(BIN_K) $(BIN_I) *.o
 
 ##
 ## Memo

@@ -1,3 +1,4 @@
+#include <getopt.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -8,18 +9,37 @@
 #include <webcam.h>
 using namespace cv;
 using namespace std;
-const int dev_num = 0;
-const int fps = 15;
 const int scale = 2; // Resizing factor.  Applied for only display, not recording.
-
+const string win_name = "main";
+Point sel1 = Point(-1, -1), sel2 = Point(-1, -1); /// region selected
 void SetControl(CHandle handle, CControlId id, int value_new);
+void MouseHandler(int event, int x, int y, int flags, void* param);
+void DrawRect(Mat *fr);
 
-int main(int, char**)
+////////////////////////////////////////////////////////////////
+int main(int argc, char** argv)
 {
+   int dev_num = 0;
+   int fps = 15;
+   int opt;
+   while ((opt = getopt(argc, argv, "d:f:")) != -1) {
+      switch (opt) {
+      case 'd':
+         dev_num = atoi(optarg);
+         cout << "Device number (-d) = " << dev_num << "\n";
+         break;
+      case 'f':
+         fps = atoi(optarg);
+         cout << "FPS (-f) = " << fps << ".\n";
+         break;
+      default:
+         cerr << "Invalid option.  Abort.\n";
+         exit(1);
+      }
+   }
+
    CResult ret;
    CHandle handle;
-   //CControlValue value;
-   
    VideoCapture cap(dev_num);
    if (!cap.isOpened()) return -1;
    Size cap_size (1280, 720);
@@ -33,10 +53,9 @@ int main(int, char**)
    
    time_t utime = time(0);
    tm* ltime = localtime(&utime);
-   char fname[256];
-   strftime(fname, sizeof(fname),"iontrap-%Y-%m-%d--%H-%M-%S.avi", ltime);
-   cv::VideoWriter writer(fname, CV_FOURCC('M','J','P','G'), fps, rec_size);
-   namedWindow("frame");
+   char fn_out[256];
+   strftime(fn_out, sizeof(fn_out),"iontrap-%Y-%m-%d--%H-%M-%S.avi", ltime);
+   VideoWriter writer;
    
    ret = c_init();
    if (ret) {
@@ -62,50 +81,41 @@ int main(int, char**)
    SetControl(handle, CC_ZOOM_ABSOLUTE ,   2);
    SetControl(handle, CC_POWER_LINE_FREQUENCY, 1); // 1 = 50 Hz
    SetControl(handle, CC_LOGITECH_LED1_MODE, 0); // 0 = off
-
+   namedWindow(win_name);
+   setMouseCallback(win_name, MouseHandler, 0);
+   
    Mat frame_now = Mat::zeros(rec_size, CV_8UC3);
-   unsigned int fr = 0;
+   unsigned int i_fr = 0;
    struct timeval time0, time1;
-   Mat frame_pre;
    bool do_record = false;
-   bool take_diff = false;
    bool loop = true;
    while (loop) {
       gettimeofday(&time0, 0);
       Mat frame_raw;
       cap >> frame_raw;
       frame_raw(Rect(x0, y0, rec_size.width, rec_size.height)).copyTo(frame_now(Rect(0, 0, rec_size.width, rec_size.height)));
-
-      Mat frame;
-      if (! take_diff) {
-	frame = frame_now.clone(); // = frame_now;
-      } else {
-         if (frame_pre.rows == 0) {
-            frame_pre = frame_now.clone();
-            continue;
-         }
-         absdiff(frame_pre, frame_now, frame);
-         frame_pre = frame_now.clone();
-      }
+      Mat frame = frame_now; // no modification
 
       time_t utime = time(0);
       tm* ltime = localtime(&utime);
-      //string ts = asctime(ltime);
       char stime[256];
       strftime(stime, sizeof(stime),"%Y-%m-%d %H:%M:%S", ltime);
       char msg[256];
-      sprintf(msg, "%s %06i", stime, fr);
-      cv::putText (frame, msg, cv::Point(10, 20),
-                   cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1.0,
-                   CV_AA);
-      
+      sprintf(msg, "%s %06i", stime, i_fr);
+      cv::putText(frame, msg, cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX,
+                  0.5, cv::Scalar(0, 255, 0), 1.0, CV_AA);
       if (do_record) {
+         if (i_fr == 0) writer.open(fn_out, CV_FOURCC('M','J','P','G'), fps, rec_size);
          writer << frame;
-         fr++;
+         i_fr++;
+         cv::putText(frame, "REC", cv::Point(rec_size.width - 40, 20),
+                     cv::FONT_HERSHEY_SIMPLEX, 0.5,
+                     cv::Scalar(0, 0, 255), 1.0, CV_AA);
       }
       if (scale != 1) resize(frame, frame, Size(), scale, scale);
-      imshow("frame", frame);
-      
+      DrawRect(&frame);
+      imshow(win_name, frame);
+
       gettimeofday(&time1, NULL);
       int time_w = (int)round(1000.0/fps - 1e3*(time1.tv_sec - time0.tv_sec) - 1e-3*(time1.tv_usec - time0.tv_usec));
       if (time_w <= 0) {
@@ -120,10 +130,6 @@ int main(int, char**)
       case 's':
          cout << "Stop recording." << endl;
          do_record = false;
-         break;
-      case 'd':
-         cout << "Set the frame-difference mode to '" << !take_diff << "'." << endl;
-         take_diff = ! take_diff;
          break;
       case 'c':
          cout << "Control." << endl;
@@ -163,3 +169,39 @@ void SetControl(CHandle handle, CControlId id, int value_new)
   }
 }
 
+void MouseHandler(int event, int x, int y, int flags, void* param)
+{
+   if (event == CV_EVENT_LBUTTONDOWN) {
+      sel1 = cv::Point(x, y);
+      //req_draw = true;
+   } else if (event == CV_EVENT_RBUTTONDOWN) {
+      sel2 = cv::Point(x, y);
+      //req_draw = true;
+   } else if (event == CV_EVENT_MBUTTONDOWN) {
+      sel1 = cv::Point(-1, -1);
+      sel2 = cv::Point(-1, -1);
+      //req_draw = true;
+   }
+}
+
+void DrawRect(Mat *fr)
+{
+   ostringstream oss;
+   if (sel1.x >= 0) {
+      oss << "L: (" << sel1.x << ", " << sel1.y << ")";
+      cv::putText (*fr, oss.str(), cv::Point(sel1.x, sel1.y-5), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1.0, CV_AA);
+      circle(*fr, sel1, 3, CV_RGB(255, 0, 0), -1);
+   }
+   if (sel2.x >= 0) {
+      oss.str("");
+      oss << "R: (" << sel2.x << ", " << sel2.y << ")";
+      cv::putText (*fr, oss.str(), cv::Point(sel2.x+5, sel2.y), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1.0, CV_AA);
+      circle(*fr, sel2, 3, CV_RGB(255, 0, 0), -1);
+   }
+   if (sel1.x >= 0 && sel2.x >= 0) {
+      oss.str("");
+      oss << abs(sel2.x-sel1.x) << "x" << abs(sel2.y-sel1.y);
+      cv::putText (*fr, oss.str(), cv::Point(sel2.x+5, (sel1.y+sel2.y)/2), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1.0, CV_AA);
+      rectangle(*fr, sel1, sel2, CV_RGB(255, 0, 0));
+   }
+}
