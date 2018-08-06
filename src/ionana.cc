@@ -22,6 +22,7 @@ int pix_slide = 2; // pixels per frame slided in the summing-up mode
 Mat frame_draw;
 bool paused = false;
 bool req_draw = false;
+bool sum_mode  = false;
 vector<int> SplitArg(const string arg, const char delim=':');
 string FindLastFile();
 //string ReadGroupLabel();
@@ -121,7 +122,7 @@ int main(int argc, char** argv)
    int i_fr_pre = -1;
    bool auto_diff = false;
    bool do_loop   = true;
-   bool sum_mode  = false;
+   sum_mode  = false;
    while (do_loop) {
       //if (fr_2 >= 0) { // In the sum mode
       //   frame = frame_sum.clone();
@@ -280,8 +281,8 @@ void SaveFrame()
 {
    ostringstream oss;
    oss << "frame_" << base_name << "_" << setfill('0');
-   if (fr_2 >= 0) oss << setw(6) << fr_1 << "-" << setw(6) << fr_2 << ".png";
-   else           oss << setw(6) << i_fr << ".png";
+   if (sum_mode) oss << setw(6) << fr_1 << "-" << setw(6) << fr_2 << ".png";
+   else          oss << setw(6) << i_fr << ".png";
    string fn_out = oss.str();
    cout << "  Save " << fn_out << endl;
    imwrite(fn_out, frame_draw);
