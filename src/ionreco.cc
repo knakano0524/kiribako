@@ -76,6 +76,8 @@ int main(int argc, char** argv)
    SetControl(handle, CC_CONTRAST      ,  50);
    SetControl(handle, CC_SATURATION    ,  20);
    SetControl(handle, CC_SHARPNESS     ,  50);
+   SetControl(handle, CC_AUTO_EXPOSURE_MODE, 0); // 0 = off???
+   SetControl(handle, CC_EXPOSURE_TIME_ABSOLUTE,  600); // depends on FPS
    SetControl(handle, CC_AUTO_FOCUS    ,   0);
    SetControl(handle, CC_FOCUS_ABSOLUTE, 255);
    SetControl(handle, CC_ZOOM_ABSOLUTE ,   2);
