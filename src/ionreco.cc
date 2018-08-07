@@ -9,7 +9,7 @@
 #include <webcam.h>
 using namespace cv;
 using namespace std;
-const int scale = 2; // Resizing factor.  Applied for only display, not recording.
+const int scale = 1; // Resizing factor.  Applied for only display, not recording.
 const string win_name = "main";
 Point sel1 = Point(-1, -1), sel2 = Point(-1, -1); /// region selected
 void SetControl(CHandle handle, CControlId id, int value_new);
@@ -42,12 +42,12 @@ int main(int argc, char** argv)
    CHandle handle;
    VideoCapture cap(dev_num);
    if (!cap.isOpened()) return -1;
-   Size cap_size (1280, 720);
+   Size cap_size (1920, 1080);
    cap.set (CV_CAP_PROP_FPS         , fps            );
    cap.set (CV_CAP_PROP_FRAME_WIDTH , cap_size.width );
    cap.set (CV_CAP_PROP_FRAME_HEIGHT, cap_size.height);
 
-   Size rec_size(400, 400); // Record only this center part of cap_size.
+   Size rec_size(600, 600); // Record only this center part of cap_size.
    int x0 = (cap_size.width  - rec_size.width ) / 2;
    int y0 = (cap_size.height - rec_size.height) / 2;
    
@@ -76,8 +76,8 @@ int main(int argc, char** argv)
    SetControl(handle, CC_CONTRAST      ,  50);
    SetControl(handle, CC_SATURATION    ,  20);
    SetControl(handle, CC_SHARPNESS     ,  50);
-   SetControl(handle, CC_AUTO_EXPOSURE_MODE, 0); // 0 = off???
-   SetControl(handle, CC_EXPOSURE_TIME_ABSOLUTE,  600); // depends on FPS
+   SetControl(handle, CC_AUTO_EXPOSURE_MODE    ,   1); // 1=off, 3=on
+   SetControl(handle, CC_EXPOSURE_TIME_ABSOLUTE, 600); // depends on FPS
    SetControl(handle, CC_AUTO_FOCUS    ,   0);
    SetControl(handle, CC_FOCUS_ABSOLUTE, 255);
    SetControl(handle, CC_ZOOM_ABSOLUTE ,   2);
@@ -163,6 +163,8 @@ void SetControl(CHandle handle, CControlId id, int value_new)
     cout << "!!ERROR!!  c_get_control(): id=" << id << ", ret=" << ret << "\n";
     exit(1);
   }
+  //cout << "SetControl(): id=" << id << ": " << value.value << " -> " << value_new << endl;
+  if (value.value == value_new) return;
   value.value = value_new;
   ret = c_set_control(handle, id, &value);
   if (ret) {
