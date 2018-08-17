@@ -9,7 +9,7 @@
 #include <webcam.h>
 using namespace cv;
 using namespace std;
-const int scale = 1; // Resizing factor.  Applied for only display, not recording.
+int scale = 1; // Resizing factor.  Applied for only display, not recording.
 const string win_name = "main";
 Point sel1 = Point(-1, -1), sel2 = Point(-1, -1); /// region selected
 CDevice* GetDevInfo(CHandle handle);
@@ -80,28 +80,44 @@ int main(int argc, char** argv)
      cap_size.height = 480;
      rec_size.width  = cap_size.height; // HxH
      rec_size.height = cap_size.height; // HxH
+     SetControl(handle, CC_BRIGHTNESS,  90); // <- 128
+     SetControl(handle, CC_CONTRAST  , 127); // <-  20
+     SetControl(handle, CC_GAMMA     ,  40); // <-  20
+     SetControl(handle, CC_SHARPNESS , 200); // <-  90
    } else if (dev_name == "Dino-Lite Basic") { // Dino-Lite 2111
      // bri -48, con 64, gam 109, gain 30, backlight 0
      // 15 fps when the gauge is inserted, but 5 fps when it isn't.
      // Is it because the devices tries an auto exposure adjustment??
-     fps = 10;
+     fps = 8;
      cap_size.width  = 640;
      cap_size.height = 480;
      rec_size.width  = cap_size.height; // HxH
      rec_size.height = cap_size.height; // HxH
-   } else if (dev_name == "???") { // Teslong
-     // 15 fps
-     fps = 15;
-     cap_size.width  = 640;
-     cap_size.height = 480;
-     rec_size.width  = cap_size.height; // HxH
-     rec_size.height = cap_size.height; // HxH
+     SetControl(handle, CC_BRIGHTNESS, -64); // <-   0
+     SetControl(handle, CC_CONTRAST  ,  64); // <-  32
+     SetControl(handle, CC_GAMMA     , 200); // <- 100
+   } else if (dev_name == "Teslong Camera") { // Teslong stick-type camera
+     // This device is fast but has a small zoom factor.
+     // A better scaling is wanted for better image quality.
+     scale = 2;
+     fps = 15; // about 15 fps in usual settings
+     cap_size.width  = 1280;
+     cap_size.height =  720;
+     rec_size.width  =  300;
+     rec_size.height =  300;
+     SetControl(handle, CC_BRIGHTNESS, 128); // <- 128 in 0-255
+     SetControl(handle, CC_CONTRAST  ,  80); // <-  32 in 0-127
+     SetControl(handle, CC_GAMMA     ,  10); // <-   7 in 1-10
+     SetControl(handle, CC_SHARPNESS ,  10); // <-   6 in 0-15
    } else if (dev_name == "USB2.0 UVC PC Camera") { // Coolingtech DM
-     fps = 9; // Max seems 8 regardless of settings.  Not good.
+     // This device is slow (<8 fps) but has the best contrast.
+     fps = 8; // 8 fps at max when dark (= long exposure)
      cap_size.width  = 640; // max = 640
      cap_size.height = 480; // max = 480
      rec_size.width  = cap_size.height; // HxH
      rec_size.height = cap_size.height; // HxH
+     SetControl(handle, CC_BRIGHTNESS, 24); // <-   0 in 0-96
+     SetControl(handle, CC_CONTRAST  , 64); // <-  64 in 0-64
    } else { // Default
      cout << "Use the default setting.  probably not optimal.\n";
      fps = 15;
