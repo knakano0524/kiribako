@@ -7,7 +7,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 using namespace cv;
 using namespace std;
-const int scale = 1; // resizing factor
+const int scale = 2; // resizing factor
 const string win_name = "main";
 int verb = 0;
 string base_name;
