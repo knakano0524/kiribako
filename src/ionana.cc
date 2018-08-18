@@ -17,8 +17,8 @@ Point sel1 = Point(-1, -1), sel2 = Point(-1, -1); /// region selected
 Point cut1 = Point(-1, -1), cut2 = Point(-1, -1); /// region to be cut out
 int n_fr;
 int i_fr = 0;
-int fr_1 = -1, fr_2 = -1; /// range for summing up
-int pix_slide = 2; // pixels per frame slided in the summing-up mode
+int fr_1 = -1, fr_2 = -1; /// range for composition
+int pix_slide = 2; // pixels per frame slided in the composition mode
 Mat frame_draw;
 bool paused = false;
 bool req_draw = false;
@@ -33,6 +33,7 @@ void MouseHandler(int event, int x, int y, int flags, void* param);
 void PosTrackerHandler(int val, void* param);
 void DrawRect(Mat *fr);
 void TakeDiffAuto(Mat* frame, bool force_init=false);
+void SumFramesV1(Mat* fr, int fr_1, int fr_2);
 void SumFrames(Mat* fr, int fr_1, int fr_2);
 
 ////////////////////////////////////////////////////////////////
@@ -61,7 +62,7 @@ int main(int argc, char** argv)
          }
          fr_1 = values[0];
          fr_2 = values[1];
-         cout << "Frame range for summing up (-f) = " << fr_1 << "..." << fr_2 << ".\n";
+         cout << "Frame range for composition (-f) = " << fr_1 << "..." << fr_2 << ".\n";
          break;
       case 'c':
          values = SplitArg(optarg, ':');
@@ -75,7 +76,7 @@ int main(int argc, char** argv)
             cerr << "!!ERROR!!  Option '-c' requires two or four integers.\n";
             exit(1);
          }
-         cout << "Pixel range for summing up (-c) = " << cut1 << "..." << cut2 << ".\n";
+         cout << "Pixel range for compsition (-c) = " << cut1 << "..." << cut2 << ".\n";
          break;
       default:
          cerr << "Invalid option.  Abort.\n";
@@ -153,8 +154,7 @@ int main(int argc, char** argv)
          cout << "Pause = " << paused << endl;
          break;
       case 's':
-         if (paused) SaveFrame();
-         else cout << "Need to set 'paused' to save the frame." << endl;
+	 SaveFrame();
          break;
       case 'd':
          auto_diff = ! auto_diff;
@@ -175,15 +175,15 @@ int main(int argc, char** argv)
          i_fr = JumpFrameRel(-fps);
          break;
       case '1':
-         cout << "Start frame for summing up = " << i_fr << ".\n";
+         cout << "Start frame for composition = " << i_fr << ".\n";
          fr_1 = i_fr;
          break;
       case '2':
-         cout << "End frame for summing up = " << i_fr << ".\n";
+         cout << "End frame for composition = " << i_fr << ".\n";
          fr_2 = i_fr;
          break;
       case '3':
-         cout << "Enter the summing-up mode.\n";
+         cout << "Enter the composition mode.\n";
          if (fr_1 < 0 || fr_2 < 0) {
             cout << "  Actually not possible.  Set both the start & end frames.\n";
          } else {
@@ -194,7 +194,7 @@ int main(int argc, char** argv)
          }
          break;
       case '4':
-         cout << "Exit the summing-up mode.\n";
+         cout << "Exit the composition mode.\n";
          sum_mode = false;
          //fr_1 = fr_2 = -1;
          break;
@@ -279,6 +279,10 @@ int JumpFrameRel(int move)
 
 void SaveFrame()
 {
+   if (!paused && !sum_mode) {
+     cout << "Need to set 'paused' or go into the composition mode to save the frame." << endl;
+     return;
+   }
    ostringstream oss;
    oss << "frame_" << base_name << "_" << setfill('0');
    if (sum_mode) oss << setw(6) << fr_1 << "-" << setw(6) << fr_2 << ".png";
@@ -371,17 +375,21 @@ void TakeDiffAuto(Mat* frame, bool force_init)
    double mean = cv::mean(*frame)[0];
    if (mean > 20) { // take a difference
       Mat frame_tmp = frame->clone();
-      absdiff(frame_pre, frame_tmp, *frame);
+      //absdiff(frame_pre, frame_tmp, *frame);
+      *frame = frame_tmp - frame_pre;
       frame_pre = frame_tmp.clone();
    } else {
       frame_pre = frame->clone();
    }
 }
 
-void SumFrames(Mat* fr, int fr_1, int fr_2)
+/** Version 1
+ * Background = previous frame.
+ */
+void SumFramesV1(Mat* fr, int fr_1, int fr_2)
 {
-   const bool use_gray = false; // faster??  not checked
-   cout << "Sum up frames " << fr_1 << "..." << fr_2 << endl;
+   const bool use_gray = true; // faster??  not checked
+   cout << "Composing frames " << fr_1 << "..." << fr_2 << " (V1)\n";
    JumpFrame(fr_1);
    Mat frame_raw;
    cap >> frame_raw;
@@ -429,4 +437,64 @@ void SumFrames(Mat* fr, int fr_1, int fr_2)
       //   if (sx > 0) frame_raw(Rect(  0, 0, xx-sx, yy)).copyTo(frame_mod(Rect(sx, 0, xx-sx, yy)));
       //   else        frame_raw(Rect(-sx, 0, xx+sx, yy)).copyTo(frame_mod(Rect( 0, 0, xx+sx, yy)));
       //}
+}
+
+/** Version 2
+ * Background = average of all frames selected.
+ */
+void SumFrames(Mat* fr, int fr_1, int fr_2)
+{
+   cout << "Composing frames " << fr_1 << "..." << fr_2 << endl;
+   Mat frame_raw;
+
+   ///
+   /// Estimate the background
+   ///
+   JumpFrame(fr_1);
+   cap >> frame_raw;
+   frame_raw.convertTo(frame_raw, CV_32FC3);
+   Mat frame_bg = Mat::zeros(frame_raw.size(), frame_raw.type());
+   frame_bg += frame_raw;
+   for (int i_fr = fr_1 + 1; i_fr <= fr_2; i_fr++) {
+     cap >> frame_raw;
+     frame_raw.convertTo(frame_raw, frame_bg.type());
+     frame_bg += frame_raw;
+   }
+   frame_bg /= fr_2-fr_1+1;
+   frame_bg.convertTo(frame_bg, CV_8UC3);
+   //imshow(win_name, frame_bg);  waitKey(0);
+   
+   ///
+   /// Sum up all frames with background subtraction
+   ///
+   JumpFrame(fr_1);
+   cap >> frame_raw;
+   frame_raw -= frame_bg;
+   resize(frame_raw, frame_raw, Size(), scale, scale);
+
+   int xx2, yy2, dx2, dy2; // cut region
+   if (cut1.x >= 0) {
+      xx2 = cut1.x < cut2.x ? cut1.x : cut2.x;
+      yy2 = cut1.y < cut2.y ? cut1.y : cut2.y;
+      dx2 = abs(cut1.x - cut2.x);
+      dy2 = abs(cut1.y - cut2.y);
+      //// Reset the selection since the window size will change
+      sel1 = cv::Point(-1, -1);
+      sel2 = cv::Point(-1, -1);
+   } else {
+      xx2 = yy2 = 0;
+      dx2 = frame_raw.cols;
+      dy2 = frame_raw.rows;
+   }
+   *fr = Mat::zeros(Size(dx2 + 100 + pix_slide*(fr_2-fr_1), dy2), frame_raw.type());
+
+   for (int i_fr = fr_1 + 1; i_fr <= fr_2; i_fr++) {
+      cap >> frame_raw;
+      frame_raw -= frame_bg;
+      resize(frame_raw, frame_raw, Size(), scale, scale);
+      Mat frame_mod = Mat::zeros(fr->size(), fr->type());
+      int sx = pix_slide * (i_fr - fr_1);
+      frame_raw(Rect(xx2, yy2, dx2, dy2)).copyTo(frame_mod(Rect(sx, 0, dx2, dy2)));
+      addWeighted(frame_mod, 1.0, *fr, 1.0, 0.0, *fr);
+   }
 }

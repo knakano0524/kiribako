@@ -73,9 +73,7 @@ int main(int argc, char** argv)
    Size cap_size;
    Size rec_size; //< Record only this center part of cap_size.
    if (dev_name == "USB camera") { // Dino-Lite 211
-     // can run with >10 fps.
-     // bri 127, con 127, gam 40, viv 255
-     fps = 10;
+     fps = 10; // can run with >10 fps.
      cap_size.width  = 640;
      cap_size.height = 480;
      rec_size.width  = cap_size.height; // HxH
@@ -88,7 +86,7 @@ int main(int argc, char** argv)
      // bri -48, con 64, gam 109, gain 30, backlight 0
      // 15 fps when the gauge is inserted, but 5 fps when it isn't.
      // Is it because the devices tries an auto exposure adjustment??
-     fps = 8;
+     fps = 7;
      cap_size.width  = 640;
      cap_size.height = 480;
      rec_size.width  = cap_size.height; // HxH
@@ -121,7 +119,7 @@ int main(int argc, char** argv)
      SetControl(handle, CC_GAMMA     ,  10); // <-   7 in 1-10
      SetControl(handle, CC_SHARPNESS ,  10); // <-   6 in 0-15
    } else if (dev_name == "USB2.0 UVC PC Camera") { // Coolingtech DM
-     // This device is slow (<8 fps) but has the best contrast.
+     // This device is rather slow but has the largest zoom factor and the best contrast.
      fps = 8; // 8 fps at max when dark (= long exposure)
      cap_size.width  = 640; // max = 640
      cap_size.height = 480; // max = 480
