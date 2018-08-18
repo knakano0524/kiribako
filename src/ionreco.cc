@@ -72,7 +72,7 @@ int main(int argc, char** argv)
    }
    Size cap_size;
    Size rec_size; //< Record only this center part of cap_size.
-   if (dev_name == "USB camera") { // Dino-Lite 311
+   if (dev_name == "USB camera") { // Dino-Lite 211
      // can run with >10 fps.
      // bri 127, con 127, gam 40, viv 255
      fps = 10;
@@ -84,7 +84,7 @@ int main(int argc, char** argv)
      SetControl(handle, CC_CONTRAST  , 127); // <-  20
      SetControl(handle, CC_GAMMA     ,  40); // <-  20
      SetControl(handle, CC_SHARPNESS , 200); // <-  90
-   } else if (dev_name == "Dino-Lite Basic") { // Dino-Lite 2111
+   } else if (dev_name == "Dino-Lite Basic") { // Dino-Lite 2101
      // bri -48, con 64, gam 109, gain 30, backlight 0
      // 15 fps when the gauge is inserted, but 5 fps when it isn't.
      // Is it because the devices tries an auto exposure adjustment??
@@ -96,6 +96,17 @@ int main(int argc, char** argv)
      SetControl(handle, CC_BRIGHTNESS, -64); // <-   0
      SetControl(handle, CC_CONTRAST  ,  64); // <-  32
      SetControl(handle, CC_GAMMA     , 200); // <- 100
+   } else if (dev_name == "Dino-Lite Premier") { // Dino-Lite 3101
+     fps = 15;
+     cap_size.width  = 640;
+     cap_size.height = 480;
+     rec_size.width  = cap_size.height; // HxH
+     rec_size.height = cap_size.height; // HxH
+     SetControl(handle, CC_BRIGHTNESS, -64); // <-   0 in -64...64
+     SetControl(handle, CC_CONTRAST  ,  64); // <-  32 in 0...64
+     SetControl(handle, CC_GAMMA     , 200); // <- 100 in 72...500
+     //SetControl(handle, CC_AUTO_EXPOSURE_MODE, 3); // not usable!
+     //SetControl(handle, CC_EXPOSURE_TIME_ABSOLUTE, 600); // not usable!
    } else if (dev_name == "Teslong Camera") { // Teslong stick-type camera
      // This device is fast but has a small zoom factor.
      // A better scaling is wanted for better image quality.
