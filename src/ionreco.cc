@@ -120,6 +120,7 @@ int main(int argc, char** argv)
      SetControl(handle, CC_SHARPNESS ,  10); // <-   6 in 0-15
    } else if (dev_name == "USB2.0 UVC PC Camera") { // Coolingtech DM
      // This device is rather slow but has the largest zoom factor and the best contrast.
+     scale = 2;
      fps = 8; // 8 fps at max when dark (= long exposure)
      cap_size.width  = 640; // max = 640
      cap_size.height = 480; // max = 480
@@ -193,6 +194,14 @@ int main(int argc, char** argv)
          time_w = 1;
       }
       switch(waitKey(time_w)){
+      case '1':
+         cout << "Set scale = 1." << endl;
+         scale = 1;
+         break;
+      case '2':
+         cout << "Set scale = 2." << endl;
+         scale = 2;
+         break;
       case 'r':
          cout << "Start recording." << endl;
          do_record = true;
