@@ -45,7 +45,7 @@ int main(int argc, char** argv)
    while ((opt = getopt(argc, argv, "vl:i:f:c:")) != -1) {
       switch (opt) {
       case 'v':
-         verb = 1;
+         verb += 1;
          break;
       case 'l':
          pix_slide = atoi(optarg);
@@ -174,6 +174,10 @@ int main(int argc, char** argv)
       case 'p':
          i_fr = JumpFrameRel(-fps);
          break;
+      case '0':
+         cout << "Reset the frame range.\n";
+         fr_1 = fr_2 = -1;
+         break;
       case '1':
          cout << "Start frame for composition = " << i_fr << ".\n";
          fr_1 = i_fr;
@@ -196,7 +200,6 @@ int main(int argc, char** argv)
       case '4':
          cout << "Exit the composition mode.\n";
          sum_mode = false;
-         //fr_1 = fr_2 = -1;
          break;
       case 'c':
          if (sel1.x < 0) {
@@ -217,11 +220,16 @@ int main(int argc, char** argv)
          do_loop = false;
          break;
       default:
-         if (! paused && ! sum_mode && i_fr < n_fr - 1) i_fr++;
+         //if (! paused && ! sum_mode && i_fr < n_fr - 1) i_fr++;
+         if (! paused && ! sum_mode) {
+           i_fr++;
+           if (i_fr >= n_fr || (fr_2 > 0 && i_fr > fr_2)) JumpFrame(0);
+           if (fr_1 > 0 && i_fr < fr_1) JumpFrame(fr_1);
+         }
          break;
       }
    }
-   
+      
    cout << "* * E N D * *" << endl;
    return 0;
 }
