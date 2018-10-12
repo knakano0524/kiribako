@@ -7,8 +7,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 using namespace cv;
 using namespace std;
-const int scale = 2; // resizing factor
 const string win_name = "main";
+int scale = 2; // resizing factor
 int verb = 0;
 string base_name;
 string name_trk;
@@ -42,13 +42,18 @@ int main(int argc, char** argv)
    string fname = "";
    int opt;
    vector<int> values;
-   while ((opt = getopt(argc, argv, "vl:i:f:c:")) != -1) {
+   while ((opt = getopt(argc, argv, "vl:s:i:f:c:")) != -1) {
       switch (opt) {
       case 'v':
          verb += 1;
          break;
       case 'l':
          pix_slide = atoi(optarg);
+         cout << "Sliding size (-l) = " << pix_slide << " pixels.\n";
+         break;
+      case 's':
+         scale = atoi(optarg);
+         cout << "Scaling factor (-s) = " << scale << ".\n";
          break;
       case 'i':
          fname = optarg;
@@ -102,7 +107,7 @@ int main(int argc, char** argv)
    if (cut1.x >= 0) { // When the cut region is given by option "-c"
       if (cut1.y < 0) {
          cut1.y = 0;
-         cut2.y = 2 * (int)(cap.get(CV_CAP_PROP_FRAME_HEIGHT)) - 1;
+         cut2.y = scale * (int)(cap.get(CV_CAP_PROP_FRAME_HEIGHT)) - 1;
       }
       sel1 = cut1;
       sel2 = cut2;
@@ -307,11 +312,17 @@ void MouseHandler(int event, int x, int y, int flags, void* param)
    if (event == CV_EVENT_LBUTTONDOWN) {
       sel1 = cv::Point(x, y);
       req_draw = true;
-      //if (sel2.x < 0) sel2 = cv::Point(x, y);
+      if (! sum_mode) {
+        cut1 = sel1;
+        cout << "Set the L cut point: (" << cut1.x << ", " << cut1.y << ")." << endl;
+      }
    } else if (event == CV_EVENT_RBUTTONDOWN) {
       sel2 = cv::Point(x, y);
       req_draw = true;
-      //if (sel1.x < 0) sel1 = cv::Point(x, y);
+      if (! sum_mode) {
+        cut2 = sel2;
+        cout << "Set the R cut point: (" << cut2.x << ", " << cut2.y << ")." << endl;
+      }
    } else if (event == CV_EVENT_MBUTTONDOWN) {
       sel1 = cv::Point(-1, -1);
       sel2 = cv::Point(-1, -1);
@@ -352,16 +363,18 @@ void PosTrackerHandler(int val, void* param)
 void DrawRect(Mat *fr)
 {
    //if (sel1.x < 0 || sel2.x < 0) return;
+  int x0 = (sum_mode && cut1.x > 0) ? cut1.x : 0;
+  int y0 = (sum_mode && cut1.y > 0) ? cut1.y : 0;
 
    ostringstream oss;
    if (sel1.x >= 0) {
-      oss << "L: (" << sel1.x << ", " << sel1.y << ")";
+      oss << "L: (" << sel1.x + x0 << ", " << sel1.y + y0 << ")";
       cv::putText (*fr, oss.str(), cv::Point(sel1.x, sel1.y-5), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1.0, CV_AA);
       circle(*fr, sel1, 3, CV_RGB(255, 0, 0), -1);
    }
    if (sel2.x >= 0) {
       oss.str("");
-      oss << "R: (" << sel2.x << ", " << sel2.y << ")";
+      oss << "R: (" << sel2.x + x0 << ", " << sel2.y + y0 << ")";
       cv::putText (*fr, oss.str(), cv::Point(sel2.x+5, sel2.y), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1.0, CV_AA);
       circle(*fr, sel2, 3, CV_RGB(255, 0, 0), -1);
    }
@@ -480,21 +493,28 @@ void SumFrames(Mat* fr, int fr_1, int fr_2)
    frame_raw -= frame_bg;
    resize(frame_raw, frame_raw, Size(), scale, scale);
 
-   int xx2, yy2, dx2, dy2; // cut region
-   if (cut1.x >= 0) {
-      xx2 = cut1.x < cut2.x ? cut1.x : cut2.x;
-      yy2 = cut1.y < cut2.y ? cut1.y : cut2.y;
-      dx2 = abs(cut1.x - cut2.x);
-      dy2 = abs(cut1.y - cut2.y);
-      //// Reset the selection since the window size will change
-      sel1 = cv::Point(-1, -1);
-      sel2 = cv::Point(-1, -1);
-   } else {
-      xx2 = yy2 = 0;
-      dx2 = frame_raw.cols;
-      dy2 = frame_raw.rows;
+   if (cut1.x < 0) { // Set the cut region if not set
+     cut1.x = cut1.y = 0;
+     cut2.x = frame_raw.cols - 1;
+     cut2.y = frame_raw.rows - 1;
    }
-   *fr = Mat::zeros(Size(dx2 + 100 + pix_slide*(fr_2-fr_1), dy2), frame_raw.type());
+   if (cut1.x > cut2.x) { // Assure "cut1.x < cut2.x"
+     int tmp = cut1.x;
+     cut1.x = cut2.x;
+     cut2.x = tmp;
+   }
+   if (cut1.y > cut2.y) { // Assure "cut1.y < cut2.y"
+     int tmp = cut1.y;
+     cut1.y = cut2.y;
+     cut2.y = tmp;
+   }
+   int dx = cut2.x - cut1.x + 1;
+   int dy = cut2.y - cut1.y + 1;
+   //// Change the selection since the window size will change
+   sel1 = cv::Point(   0,    0); // cv::Point(-1, -1);
+   sel2 = cv::Point(dx-1, dy-1); // cv::Point(-1, -1);
+
+   *fr = Mat::zeros(Size(dx + 200 + pix_slide*(fr_2-fr_1), dy), frame_raw.type());
 
    for (int i_fr = fr_1 + 1; i_fr <= fr_2; i_fr++) {
       cap >> frame_raw;
@@ -502,7 +522,7 @@ void SumFrames(Mat* fr, int fr_1, int fr_2)
       resize(frame_raw, frame_raw, Size(), scale, scale);
       Mat frame_mod = Mat::zeros(fr->size(), fr->type());
       int sx = pix_slide * (i_fr - fr_1);
-      frame_raw(Rect(xx2, yy2, dx2, dy2)).copyTo(frame_mod(Rect(sx, 0, dx2, dy2)));
+      frame_raw(Rect(cut1.x, cut1.y, dx, dy)).copyTo(frame_mod(Rect(sx, 0, dx, dy)));
       addWeighted(frame_mod, 1.0, *fr, 1.0, 0.0, *fr);
    }
 }
