@@ -10,7 +10,7 @@
 #include <webcam.h>
 using namespace cv;
 using namespace std;
-
+CDevice* GetDevInfo(CHandle handle);
 void SetControl(CHandle handle, CControlId id, int value_new);
 void ChangePlaybackPos(int& idx_pb, int val);
 void SaveFrame(const int idx_pb);
@@ -88,7 +88,13 @@ int main(int argc, char** argv)
       c_cleanup();
       return 1;
    }
-
+   CDevice *info = GetDevInfo(handle);
+   string dev_name = info->name;
+   cout << "Device name = " << dev_name << "\n";
+   if (dev_name != "HD Webcam C615") {
+     cout << "  Not 'HD Webcam C615'?  The device setting might be improper.\n";
+   }
+   
    SetControl(handle, CC_BRIGHTNESS    , 120);
    SetControl(handle, CC_CONTRAST      ,  50);
    SetControl(handle, CC_SATURATION    ,  20);
@@ -112,8 +118,9 @@ int main(int argc, char** argv)
      gettimeofday(&time0, 0);
 
      if (mode == PLAYBACK) {
+       cout << "Playback #" << idx_pb << endl;
        FrameData* fd = &buffer_frame.at(idx_pb);
-       imshow("frame", fd->fr);
+       imshow("frame", fd->mat);
      } else { // DISPLAY or RECORD
        Mat frame_now;
        cap >> frame_now;
@@ -167,9 +174,8 @@ int main(int argc, char** argv)
        cout << "Wait time = " << time_w << " us.  FPS is too large." << endl;
        time_w = 1;
      }
-     switch(waitKey(time_w)){
-       //Logicool C615 focus has 17 values, 0, 17, 34, 51, , , 238, 255
-     case 'p':
+     switch (waitKey(time_w) % 256) {
+     case 'p': // Logicool C615 focus has 17 values, 0, 17, 34, 51, , , 238, 255
        c_get_control(handle, CC_FOCUS_ABSOLUTE, &value);
        if (value.value < 255) value.value += 17;
        c_set_control(handle, CC_FOCUS_ABSOLUTE, &value);
@@ -236,6 +242,19 @@ int main(int argc, char** argv)
    c_cleanup();
    
    return 0;
+}
+
+CDevice* GetDevInfo(CHandle handle)
+{
+  unsigned int size = sizeof(CDevice) + 32 + 84;
+  CDevice *info = (CDevice*)malloc(size);
+  int ret = c_get_device_info(handle, 0, info, &size);
+  if (ret != 0) {
+    cerr << "!!ERROR!!  GetDevInfo(): c_get_device_info() returned " << ret
+	 << ".  Abort.\n";
+    exit(1);
+  }
+  return info;
 }
 
 void SetControl(CHandle handle, CControlId id, int value_new)
