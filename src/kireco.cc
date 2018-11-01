@@ -13,7 +13,7 @@ using namespace std;
 CDevice* GetDevInfo(CHandle handle);
 void SetControl(CHandle handle, CControlId id, int value_new);
 void ChangePlaybackPos(int& idx_pb, int val);
-void SaveFrame(const int idx_pb);
+void SaveFrame(const string bname, const int idx_pb);
 
 struct FrameData {
   int fr;
@@ -69,10 +69,9 @@ int main(int argc, char** argv)
    
    time_t utime = time(0);
    tm* ltime = localtime(&utime);
-   char fn_out[256];
-   strftime(fn_out, sizeof(fn_out),"kiribako-%Y-%m-%d--%H-%M-%S.avi", ltime);
-   VideoWriter writer;   
-   
+   char fn_base[256];
+   strftime(fn_base, sizeof(fn_base),"kiribako-%Y-%m-%d--%H-%M-%S", ltime);
+
    //initialize webcam
    ret = c_init();
    if (ret) {
@@ -110,6 +109,7 @@ int main(int argc, char** argv)
    int idx_pb = 0;
    struct timeval time0, time1;
    Mat frame_pre;
+   VideoWriter writer;   
    //bool do_record = false;
    bool take_diff = false;
    bool do_negate = false;
@@ -118,9 +118,11 @@ int main(int argc, char** argv)
      gettimeofday(&time0, 0);
 
      if (mode == PLAYBACK) {
-       cout << "Playback #" << idx_pb << endl;
-       FrameData* fd = &buffer_frame.at(idx_pb);
-       imshow("frame", fd->mat);
+       cout << "Playback: " << idx_pb+1 << " / " << buffer_frame.size() << endl;
+       Mat mat = buffer_frame.at(idx_pb).mat.clone();
+       cv::putText(mat, "playback", cv::Point(cap_size.width-250, 50),
+                   cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255), 4.0, CV_AA);
+       imshow("frame", mat);
      } else { // DISPLAY or RECORD
        Mat frame_now;
        cap >> frame_now;
@@ -148,31 +150,36 @@ int main(int argc, char** argv)
        strftime(stime, sizeof(stime),"%Y-%m-%d %H:%M:%S", ltime);
        char msg[256];
        sprintf(msg, "%s %06i", stime, i_fr);
-       cv::putText (frame, msg, cv::Point (50,50), cv::FONT_HERSHEY_SIMPLEX, 2,
-                    cv::Scalar (100, 50, 50), 5, CV_AA);
+       cv::putText (frame, msg, cv::Point(50,50), cv::FONT_HERSHEY_SIMPLEX, 1.5,
+                    cv::Scalar(100, 50, 50), 4.0, CV_AA);
+
+       buffer_frame.push_back(FrameData(i_fr, &frame));
+       if (buffer_frame.size() > (unsigned)n_buf) buffer_frame.pop_front();
+
        if (mode == RECORD) {
          if (! writer.isOpened()) {
-           if (! writer.open(fn_out, CV_FOURCC('M','J','P','G'), fps, cap_size)) {
+           string fn_out = (string)fn_base + ".avi";
+           if (! writer.open(fn_out.c_str(), CV_FOURCC('M','J','P','G'), fps, cap_size)) {
              cerr << "!!ERROR!!  Failed at opening the output file.  Abort.\n";
              exit(1);
            }
          }
          writer << frame;
-         cv::putText(frame, "REC", cv::Point(cap_size.width - 130, 50),
-                     cv::FONT_HERSHEY_SIMPLEX, 2,
-                     cv::Scalar(0, 0, 255), 5, CV_AA);
+         cv::putText(frame, "REC", cv::Point(cap_size.width-130, 50),
+                     cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255), 4.0, CV_AA);
        }
        imshow("frame", frame);
-     
-       buffer_frame.push_back(FrameData(i_fr, &frame));
-       if (buffer_frame.size() > (unsigned)n_buf) buffer_frame.pop_front();
      }
      
-     gettimeofday(&time1, NULL);
-     int time_w = (int)round(1000.0/fps - 1e3*(time1.tv_sec - time0.tv_sec) - 1e-3*(time1.tv_usec - time0.tv_usec));
-     if (time_w <= 0) {
-       cout << "Wait time = " << time_w << " us.  FPS is too large." << endl;
-       time_w = 1;
+     int time_w;
+     if (mode == PLAYBACK) time_w = 0;
+     else {
+       gettimeofday(&time1, NULL);
+       time_w = (int)round(1000.0/fps - 1e3*(time1.tv_sec - time0.tv_sec) - 1e-3*(time1.tv_usec - time0.tv_usec));
+       if (time_w <= 0) {
+         cout << "Wait time = " << time_w << " us.  FPS is too large." << endl;
+         time_w = 1;
+       }
      }
      switch (waitKey(time_w) % 256) {
      case 'p': // Logicool C615 focus has 17 values, 0, 17, 34, 51, , , 238, 255
@@ -182,7 +189,7 @@ int main(int argc, char** argv)
        ret = c_get_control(handle, CC_FOCUS_ABSOLUTE, &value);
        cout << "Focus = " << value.value << "\n";
        break;
-     case 'm':
+     case 'o':
        c_get_control(handle, CC_FOCUS_ABSOLUTE, &value);
        if (value.value > 0) value.value -= 17;
        c_set_control(handle, CC_FOCUS_ABSOLUTE, &value);
@@ -211,23 +218,23 @@ int main(int argc, char** argv)
        oss << "guvcview --device=/dev/video" << dev_num << " --control_panel &";
        system(oss.str().c_str()); 
        break;
-     case '.':
+     case '.':   case 83: // left arrow
        ChangePlaybackPos(idx_pb, +1);
        break;
-     case ',':
+     case ',':   case 81: // right arrow
        ChangePlaybackPos(idx_pb, -1);
        break;
-     case '>':
+     case '>':   case 82: // up arrow
        ChangePlaybackPos(idx_pb, +fps);
        break;
-     case '<':
+     case '<':   case 84: // down arrow
        ChangePlaybackPos(idx_pb, -fps);
        break;
      case '/':
        mode = DISPLAY;
        break;
-     case '?':
-       SaveFrame(idx_pb);
+     case 'm':
+       SaveFrame(fn_base, idx_pb);
        break;
      case 'q':
        cout << "Quit." << endl;
@@ -286,12 +293,12 @@ void ChangePlaybackPos(int& idx_pb, int val)
   idx_pb = idx_new;
 }
 
-void SaveFrame(const int idx_pb)
+void SaveFrame(const string bname, const int idx_pb)
 {
   if (mode != PLAYBACK) return;
   FrameData* fd = &buffer_frame.at(idx_pb);
   ostringstream oss;
-  oss << "kireco_" << setfill('0') << setw(6) << fd->fr << ".png";
+  oss << bname << "--" << setfill('0') << setw(6) << fd->fr << ".png";
   string fn_out = oss.str();
   cout << "  Save " << fn_out << endl;
   imwrite(fn_out, fd->mat);
