@@ -2,11 +2,12 @@
 # Script to export local files to the web server.
 # To be executed manually or via crontab:
 #   */10 *  * * *  $HOME/kiribako/bin/sync-export.sh &>/dev/null
-DIR_SRC=~/kiribako/export
+DIR_BASE=$(readlink -f $(dirname $0)/../)
+DIR_SRC=$DIR_BASE/export
 DIR_DST=hep4.nucl.phys.titech.ac.jp:/var/www/html/kiribako/data
 
 FN_ENA=$DIR_SRC/.sync-export.enabled
-FN_GRP=~/.b3exp.conf
+FN_GRP=$DIR_SRC/.sync-export.conf
 if [ "X$1" = "Xon" ] ; then
     echo "Enable the export and exit."
     touch $FN_ENA
