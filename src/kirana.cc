@@ -108,31 +108,31 @@ int main(int argc, char** argv)
       //waitKey(0);
        
       //if (waitKey(msec_fr) >= 0) break;
-      switch (waitKey(msec_fr)) {
+      switch (waitKey(msec_fr) % 256) {
       case ' ':
          paused = ! paused;
          cout << "Pause = " << paused << endl;
          break;
-      case 's':
+      case 'm':
          if (paused) SaveFrame();
-         else cout << "Set paused to save the frame." << endl;
+         else cout << "Cannot save during playback.  Do 'pause' first." << endl;
          break;
       case 'd':
          auto_diff = ! auto_diff;
          cout << "Auto-differential mode = " << auto_diff << endl;
          break;
-      case '.':
+      case '.':   case 83: // left arrow
          paused = true;
          i_fr = JumpFrameRel(+1);
          break;
-      case ',':
+     case ',':   case 81: // right arrow
          paused = true;
          i_fr = JumpFrameRel(-1);
          break;
-      case 'n':
+     case '>':   case 82: // up arrow
          i_fr = JumpFrameRel(+fps);
          break;
-      case 'p':
+     case '<':   case 84: // down arrow
          i_fr = JumpFrameRel(-fps);
          break;
       case 'q':
