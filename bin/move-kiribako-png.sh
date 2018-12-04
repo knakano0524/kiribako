@@ -1,13 +1,23 @@
 #!/bin/bash
 DIR_BASE=$(readlink -f $(dirname $0)/../)
 
-echo "Will move 'kiribako-*.png'."
-for FN in $DIR_BASE/iontrap-*.avi ; do
-    echo $(basename ${FN%--*})
-done | sort -u | while read BN ; do
-    echo "  Target: $BN"
-    DIR_BN=$DIR_BASE/export/$BN
-    mkdir -p $DIR_BN
-    mv $DIR_BASE/$BN--* $DIR_BN
-    zip -ur $DIR_BN/$BN.zip $DIR_BASE/$BN
+if [ $(readlink -f $PWD) != $DIR_BASE ] ; then
+    echo "Run this script in $DIR_BASE.  Abort."
+    exit
+fi
+if [ ! -d export ] ; then
+    echo "The directory 'export' does not exist.  Abort."
+    exit
+fi
+
+echo "Will move files as groups listed below:"
+for FN in kiribako-*.png ; do
+    echo "  File : $FN" >/dev/stderr
+    echo ${FN%--*.png}
+done | sort -u | while read GRP ; do
+    echo "  Group: $GRP" >/dev/stderr
+    DIR_GRP=export/$GRP
+    mkdir -p $DIR_GRP
+    mv $GRP--*.png $DIR_GRP
+    ( cd export && zip -urq $GRP.zip $GRP )
 done
