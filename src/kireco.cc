@@ -13,7 +13,7 @@ using namespace cv;
 using namespace std;
 CDevice* GetDevInfo(CHandle handle);
 void SetControl(CHandle handle, CControlId id, int value_new);
-void ChangePlaybackPos(int& idx_pb, int val);
+void ChangePlaybackPos(bool& do_pb, int& idx_pb, int val);
 void SaveFrame(const string bname, const int idx_pb);
 
 struct FrameData {
@@ -26,8 +26,8 @@ struct FrameData {
 };
 deque<FrameData> buffer_frame;
 
-typedef enum { DISPLAY, RECORD, PLAYBACK } KirecoMode_t;
-KirecoMode_t mode = DISPLAY;
+//typedef enum { DISPLAY, RECORD, PLAYBACK } KirecoMode_t;
+//KirecoMode_t mode = DISPLAY;
 
 int main(int argc, char** argv)
 {
@@ -111,14 +111,16 @@ int main(int argc, char** argv)
    struct timeval time0, time1;
    Mat frame_pre;
    VideoWriter writer;   
-   //bool do_record = false;
+   bool do_record = false;
+   bool do_playback = false;
    bool take_diff = false;
    bool do_negate = false;
    bool loop      = true;
    while (loop) {
      gettimeofday(&time0, 0);
 
-     if (mode == PLAYBACK) {
+     
+     if (do_playback) { //if (mode == PLAYBACK) {
        cout << "Playback: " << idx_pb+1 << " / " << buffer_frame.size() << endl;
        Mat mat = buffer_frame.at(idx_pb).mat.clone();
        cv::putText(mat, "playback", cv::Point(cap_size.width-250, 50),
@@ -157,7 +159,7 @@ int main(int argc, char** argv)
        buffer_frame.push_back(FrameData(i_fr, &frame));
        if (buffer_frame.size() > (unsigned)n_buf) buffer_frame.pop_front();
 
-       if (mode == RECORD) {
+       if (do_record) { // if (mode == RECORD) {
          if (! writer.isOpened()) {
            string fn_out = (string)fn_base + ".avi";
            if (! writer.open(fn_out.c_str(), CV_FOURCC('M','J','P','G'), fps, cap_size)) {
@@ -173,7 +175,7 @@ int main(int argc, char** argv)
      }
      
      int time_w;
-     if (mode == PLAYBACK) time_w = 0;
+     if (do_playback) time_w = 0; //if (mode == PLAYBACK) time_w = 0;
      else {
        gettimeofday(&time1, NULL);
        time_w = (int)round(1000.0/fps - 1e3*(time1.tv_sec - time0.tv_sec) - 1e-3*(time1.tv_usec - time0.tv_usec));
@@ -199,11 +201,11 @@ int main(int argc, char** argv)
        break;
      case 'r':
        cout << "Start recording." << endl;
-       mode = RECORD;
+       do_record = true; // mode = RECORD;
        break;
      case 's':
        cout << "Stop recording." << endl;
-       mode = DISPLAY;
+       do_record = false; // mode = DISPLAY;
        break;
      case 'd':
        cout << "Set the frame-difference mode to '" << !take_diff << "'." << endl;
@@ -220,22 +222,22 @@ int main(int argc, char** argv)
        system(oss.str().c_str()); 
        break;
      case '.':   case 83: // left arrow
-       ChangePlaybackPos(idx_pb, +1);
+       ChangePlaybackPos(do_playback, idx_pb, +1);
        break;
      case ',':   case 81: // right arrow
-       ChangePlaybackPos(idx_pb, -1);
+       ChangePlaybackPos(do_playback, idx_pb, -1);
        break;
      case '>':   case 82: // up arrow
-       ChangePlaybackPos(idx_pb, +fps);
+       ChangePlaybackPos(do_playback, idx_pb, +fps);
        break;
      case '<':   case 84: // down arrow
-       ChangePlaybackPos(idx_pb, -fps);
+       ChangePlaybackPos(do_playback, idx_pb, -fps);
        break;
      case '/':
-       mode = DISPLAY;
+       do_playback = false; // mode = DISPLAY;
        break;
      case 'm':
-       SaveFrame(fn_base, idx_pb);
+       if (do_playback) SaveFrame(fn_base, idx_pb);
        break;
      case 'q':
        cout << "Quit." << endl;
@@ -281,11 +283,11 @@ void SetControl(CHandle handle, CControlId id, int value_new)
   }
 }
 
-void ChangePlaybackPos(int& idx_pb, int val)
+void ChangePlaybackPos(bool& do_pb, int& idx_pb, int val)
 {
   int n_fr = buffer_frame.size();
-  if (mode != PLAYBACK) {
-    mode = PLAYBACK;
+  if (! do_pb) { // if (mode != PLAYBACK) {
+    do_pb  = true; // //mode = PLAYBACK;
     idx_pb = n_fr;
   }
   int idx_new = idx_pb + val;
@@ -296,7 +298,6 @@ void ChangePlaybackPos(int& idx_pb, int val)
 
 void SaveFrame(const string bname, const int idx_pb)
 {
-  if (mode != PLAYBACK) return;
   FrameData* fd = &buffer_frame.at(idx_pb);
   ostringstream oss;
   oss << bname << "--" << setfill('0') << setw(6) << fd->fr << ".png";
