@@ -169,7 +169,7 @@ int main(int argc, char** argv)
 
       time_t utime = time(0);
       tm* ltime = localtime(&utime);
-      char stime[256];
+      char stime[128];
       strftime(stime, sizeof(stime),"%Y-%m-%d %H:%M:%S", ltime);
       char msg[256];
       sprintf(msg, "%s %06i", stime, i_fr);
