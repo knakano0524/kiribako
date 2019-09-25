@@ -118,7 +118,7 @@ int main(int argc, char** argv)
      SetControl(handle, CC_CONTRAST  ,  80); // <-  32 in 0-127
      SetControl(handle, CC_GAMMA     ,  10); // <-   7 in 1-10
      SetControl(handle, CC_SHARPNESS ,  10); // <-   6 in 0-15
-   } else if (dev_name == "USB2.0 UVC PC Camera") { // Coolingtech DM
+   } else if (dev_name == "USB2.0 UVC PC Camera: USB2.0 UV") { // Coolingtech DM
      // This device is rather slow but has the largest zoom factor and the best contrast.
      scale = 2;
      fps = 8; // 8 fps at max when dark (= long exposure)
