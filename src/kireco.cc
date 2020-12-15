@@ -11,10 +11,16 @@
 #include <webcam.h>
 using namespace cv;
 using namespace std;
+Point pos_C = Point(-1, -1); // Current cursor position
+Point pos_L = Point(-1, -1); // Left-clicked cursor position
+Point pos_R = Point(-1, -1); // Right-clicked cursor position
 CDevice* GetDevInfo(CHandle handle);
 void SetControl(CHandle handle, CControlId id, int value_new);
+void MouseHandler(int event, int x, int y, int flags, void* param);
+void DrawPosPoint(Mat *fr, Point *pt, const string label);
+void DrawPosLine (Mat *fr, Point *pt1, Point* pt2);
 void ChangePlaybackPos(bool& do_pb, int& idx_pb, int val);
-void SaveFrame(const string bname, const int idx_pb);
+void SaveFrame(const string bname, const int idx_pb, Mat* fr=0);
 
 struct FrameData {
   int fr;
@@ -105,46 +111,58 @@ int main(int argc, char** argv)
    SetControl(handle, CC_POWER_LINE_FREQUENCY, 1); // 0 = off, 1 = 50 Hz, 2 = 60 Hz
    SetControl(handle, CC_LOGITECH_LED1_MODE, 0); // 0 = off
    namedWindow("frame");
+   setMouseCallback("frame", MouseHandler, 0);
 
    unsigned int i_fr = 0;
    int idx_pb = 0;
    struct timeval time0, time1;
    Mat frame_pre;
    VideoWriter writer;   
-   bool do_record = false;
+   bool do_record   = false;
    bool do_playback = false;
-   bool take_diff = false;
-   bool do_negate = false;
-   bool loop      = true;
+   bool take_diff   = false;
+   bool do_negate   = false;
+   bool draw_point  = false;
+   bool draw_line   = false;
+   bool loop        = true;
    while (loop) {
      gettimeofday(&time0, 0);
 
-     
+     Mat fr_show;     
      if (do_playback) { //if (mode == PLAYBACK) {
        cout << "Playback: " << idx_pb+1 << " / " << buffer_frame.size() << endl;
-       Mat mat = buffer_frame.at(idx_pb).mat.clone();
-       cv::putText(mat, "playback", cv::Point(cap_size.width-250, 50),
+       fr_show = buffer_frame.at(idx_pb).mat.clone();
+       cv::putText(fr_show, "playback", cv::Point(cap_size.width-250, 50),
                    cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255), 4.0, CV_AA);
-       imshow("frame", mat);
+       if (draw_point) {
+         DrawPosPoint(&fr_show, &pos_C, "");
+         DrawPosPoint(&fr_show, &pos_L, "L");
+         DrawPosPoint(&fr_show, &pos_R, "R");
+       }
+       if (draw_line) {
+         DrawPosLine(&fr_show, &pos_C, &pos_L);
+         DrawPosLine(&fr_show, &pos_C, &pos_R);
+         DrawPosLine(&fr_show, &pos_L, &pos_R);
+       }
+       imshow("frame", fr_show);
      } else { // DISPLAY or RECORD
        Mat frame_now;
        cap >> frame_now;
        i_fr++;
       
-       Mat frame;
        if (! take_diff) {
-         frame = frame_now;
+         fr_show = frame_now;
        } else {
          if (frame_pre.rows == 0) { // frame_pre is not set
            frame_pre = frame_now;
            continue;
          }
-         absdiff(frame_pre, frame_now, frame);
+         absdiff(frame_pre, frame_now, fr_show);
          frame_pre = frame_now;
        }
        if (do_negate) {
-         static Mat mat0 = Mat(frame.rows, frame.cols, frame.type(), Scalar(1,1,1))*255;
-         subtract(mat0, frame, frame);
+         static Mat mat0 = Mat(fr_show.rows, fr_show.cols, fr_show.type(), Scalar(1,1,1))*255;
+         subtract(mat0, fr_show, fr_show);
        }
       
        time_t utime = time(0);
@@ -153,10 +171,10 @@ int main(int argc, char** argv)
        strftime(stime, sizeof(stime),"%Y-%m-%d %H:%M:%S", ltime);
        char msg[256];
        sprintf(msg, "%s %06i", stime, i_fr);
-       cv::putText (frame, msg, cv::Point(50,50), cv::FONT_HERSHEY_SIMPLEX, 1.5,
+       cv::putText (fr_show, msg, cv::Point(50,50), cv::FONT_HERSHEY_SIMPLEX, 1.5,
                     cv::Scalar(100, 50, 50), 4.0, CV_AA);
 
-       buffer_frame.push_back(FrameData(i_fr, &frame));
+       buffer_frame.push_back(FrameData(i_fr, &fr_show));
        if (buffer_frame.size() > (unsigned)n_buf) buffer_frame.pop_front();
 
        if (do_record) { // if (mode == RECORD) {
@@ -167,22 +185,38 @@ int main(int argc, char** argv)
              exit(1);
            }
          }
-         writer << frame;
-         cv::putText(frame, "REC", cv::Point(cap_size.width-130, 50),
+         writer << fr_show;
+         cv::putText(fr_show, "REC", cv::Point(cap_size.width-130, 50),
                      cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255), 4.0, CV_AA);
        }
-       imshow("frame", frame);
+       if (draw_point) {
+         DrawPosPoint(&fr_show, &pos_C, "");
+         DrawPosPoint(&fr_show, &pos_L, "L");
+         DrawPosPoint(&fr_show, &pos_R, "R");
+       }
+       if (draw_line) {
+         DrawPosLine(&fr_show, &pos_C, &pos_L);
+         DrawPosLine(&fr_show, &pos_C, &pos_R);
+         DrawPosLine(&fr_show, &pos_L, &pos_R);
+       }
+       imshow("frame", fr_show);
      }
      
-     int time_w;
-     if (do_playback) time_w = 0; //if (mode == PLAYBACK) time_w = 0;
-     else {
-       gettimeofday(&time1, NULL);
-       time_w = (int)round(1000.0/fps - 1e3*(time1.tv_sec - time0.tv_sec) - 1e-3*(time1.tv_usec - time0.tv_usec));
-       if (time_w <= 0) {
-         cout << "Wait time = " << time_w << " us.  FPS is too large." << endl;
-         time_w = 1;
-       }
+     //int time_w;
+     //if (do_playback) time_w = 0;
+     //else {
+     //  gettimeofday(&time1, NULL);
+     //  time_w = (int)round(1000.0/fps - 1e3*(time1.tv_sec - time0.tv_sec) - 1e-3*(time1.tv_usec - time0.tv_usec));
+     //  if (time_w <= 0) {
+     //    cout << "Wait time = " << time_w << " us.  FPS is too large." << endl;
+     //    time_w = 1;
+     //  }
+     //}
+     gettimeofday(&time1, NULL);
+     int time_w = (int)round(1000.0/fps - 1e3*(time1.tv_sec - time0.tv_sec) - 1e-3*(time1.tv_usec - time0.tv_usec));
+     if (time_w <= 0) {
+       cout << "Wait time = " << time_w << " us.  FPS is too large." << endl;
+       time_w = 1;
      }
      switch (waitKey(time_w) % 256) {
      case 'p': // Logicool C615 focus has 17 values, 0, 17, 34, 51, , , 238, 255
@@ -215,6 +249,14 @@ int main(int argc, char** argv)
        cout << "Set the negative mode to '" << !do_negate << "'." << endl;
        do_negate = ! do_negate;
        break;
+     case 'P':
+       cout << "Set the draw-point mode to '" << !draw_point << "'." << endl;
+       draw_point = ! draw_point;
+       break;
+     case 'L':
+       cout << "Set the draw-line mode to '" << !draw_point << "'." << endl;
+       draw_line = ! draw_line;
+       break;
      case 'c':
        cout << "Control." << endl;
        oss.str("");
@@ -237,7 +279,7 @@ int main(int argc, char** argv)
        do_playback = false; // mode = DISPLAY;
        break;
      case 'm':
-       if (do_playback) SaveFrame(fn_base, idx_pb);
+       if (do_playback) SaveFrame(fn_base, idx_pb, &fr_show);
        break;
      case 'q':
        cout << "Quit." << endl;
@@ -283,6 +325,43 @@ void SetControl(CHandle handle, CControlId id, int value_new)
   }
 }
 
+void MouseHandler(int event, int x, int y, int flags, void* param)
+{
+  if (event == CV_EVENT_MOUSEMOVE) {
+    pos_C = cv::Point(x, y);
+  } else if (event == CV_EVENT_LBUTTONDOWN) {
+    pos_L = cv::Point(x, y);
+  } else if (event == CV_EVENT_RBUTTONDOWN) {
+    pos_R = cv::Point(x, y);
+  } else if (event == CV_EVENT_MBUTTONDOWN) {
+    pos_L = cv::Point(-1, -1);
+    pos_R = cv::Point(-1, -1);
+  }
+}
+
+void DrawPosPoint(Mat *fr, Point *pt, const string label)
+{
+  if (pt->x < 0) return;
+  ostringstream oss;
+  oss << label << " (" << pt->x << ", " << pt->y << ")";
+  cv::putText (*fr, oss.str(), cv::Point(pt->x + 5, pt->y), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1.0, CV_AA);
+  circle(*fr, *pt, 3, CV_RGB(255, 0, 0), -1);
+}
+
+void DrawPosLine(Mat *fr, Point *pt1, Point* pt2)
+{
+  if (pt1->x < 0 || pt2->x < 0) return;
+  ostringstream oss;
+  int cx =    (pt1->x + pt2->x) / 2;
+  int cy =    (pt1->y + pt2->y) / 2;
+  int dx = abs(pt1->x - pt2->x);
+  int dy = abs(pt1->y - pt2->y);
+  oss.str("");
+  oss << dx << "x" << dy << ", " << (int)sqrt(dx*dx + dy*dy);
+  cv::putText (*fr, oss.str(), cv::Point(cx + 5, cy), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1.0, CV_AA);
+  line(*fr, *pt1, *pt2, CV_RGB(0, 255, 0));
+}
+
 void ChangePlaybackPos(bool& do_pb, int& idx_pb, int val)
 {
   int n_fr = buffer_frame.size();
@@ -296,7 +375,7 @@ void ChangePlaybackPos(bool& do_pb, int& idx_pb, int val)
   idx_pb = idx_new;
 }
 
-void SaveFrame(const string bname, const int idx_pb)
+void SaveFrame(const string bname, const int idx_pb, Mat* fr)
 {
   FrameData* fd = &buffer_frame.at(idx_pb);
   ostringstream oss;
@@ -304,4 +383,10 @@ void SaveFrame(const string bname, const int idx_pb)
   string fn_out = oss.str();
   cout << "  Save " << fn_out << endl;
   imwrite(fn_out, fd->mat);
+
+  if (fr) {
+    ostringstream oss;
+    oss << "Saved as " << fn_out << ".";
+    cv::putText(*fr, oss.str(), cv::Point(10, 10), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1.0, CV_AA);
+  }
 }
