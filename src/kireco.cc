@@ -20,7 +20,7 @@ void MouseHandler(int event, int x, int y, int flags, void* param);
 void DrawPosPoint(Mat *fr, Point *pt, const string label);
 void DrawPosLine (Mat *fr, Point *pt1, Point* pt2);
 void ChangePlaybackPos(bool& do_pb, int& idx_pb, int val);
-void SaveFrame(const string bname, const int idx_pb, Mat* fr=0);
+void SaveFrame(const string bname, const int idx_pb, const bool save_as_is, Mat* fr=0);
 
 struct FrameData {
   int fr;
@@ -103,10 +103,10 @@ int main(int argc, char** argv)
    
    SetControl(handle, CC_BRIGHTNESS    , 120);
    SetControl(handle, CC_CONTRAST      ,  50);
-   SetControl(handle, CC_SATURATION    ,  20);
+   SetControl(handle, CC_SATURATION    , 100);
    SetControl(handle, CC_SHARPNESS     ,  50);
    SetControl(handle, CC_AUTO_FOCUS    ,   0);
-   SetControl(handle, CC_FOCUS_ABSOLUTE, 119); // 119 for zoom=1, 85 for zoom=2
+   SetControl(handle, CC_FOCUS_ABSOLUTE, 102); // 119 for zoom=1, 85 for zoom=2
    SetControl(handle, CC_ZOOM_ABSOLUTE ,   1); // 1 or 2
    SetControl(handle, CC_POWER_LINE_FREQUENCY, 1); // 0 = off, 1 = 50 Hz, 2 = 60 Hz
    SetControl(handle, CC_LOGITECH_LED1_MODE, 0); // 0 = off
@@ -122,29 +122,17 @@ int main(int argc, char** argv)
    bool do_playback = false;
    bool take_diff   = false;
    bool do_negate   = false;
+   bool save_as_is  = true;
    bool draw_point  = false;
    bool draw_line   = false;
    bool loop        = true;
    while (loop) {
      gettimeofday(&time0, 0);
-
-     Mat fr_show;     
+     
+     Mat fr_show; // An image to be shown on display
+     Mat fr_save; // An image to be saved to file
      if (do_playback) { //if (mode == PLAYBACK) {
-       cout << "Playback: " << idx_pb+1 << " / " << buffer_frame.size() << endl;
        fr_show = buffer_frame.at(idx_pb).mat.clone();
-       cv::putText(fr_show, "playback", cv::Point(cap_size.width-250, 50),
-                   cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255), 4.0, CV_AA);
-       if (draw_point) {
-         DrawPosPoint(&fr_show, &pos_C, "");
-         DrawPosPoint(&fr_show, &pos_L, "L");
-         DrawPosPoint(&fr_show, &pos_R, "R");
-       }
-       if (draw_line) {
-         DrawPosLine(&fr_show, &pos_C, &pos_L);
-         DrawPosLine(&fr_show, &pos_C, &pos_R);
-         DrawPosLine(&fr_show, &pos_L, &pos_R);
-       }
-       imshow("frame", fr_show);
      } else { // DISPLAY or RECORD
        Mat frame_now;
        cap >> frame_now;
@@ -189,18 +177,23 @@ int main(int argc, char** argv)
          cv::putText(fr_show, "REC", cv::Point(cap_size.width-130, 50),
                      cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255), 4.0, CV_AA);
        }
-       if (draw_point) {
-         DrawPosPoint(&fr_show, &pos_C, "");
-         DrawPosPoint(&fr_show, &pos_L, "L");
-         DrawPosPoint(&fr_show, &pos_R, "R");
-       }
-       if (draw_line) {
-         DrawPosLine(&fr_show, &pos_C, &pos_L);
-         DrawPosLine(&fr_show, &pos_C, &pos_R);
-         DrawPosLine(&fr_show, &pos_L, &pos_R);
-       }
-       imshow("frame", fr_show);
      }
+
+     if (draw_point) {
+       DrawPosPoint(&fr_show, &pos_C, "");
+       DrawPosPoint(&fr_show, &pos_L, "L");
+       DrawPosPoint(&fr_show, &pos_R, "R");
+     }
+     if (draw_line) {
+       DrawPosLine(&fr_show, &pos_C, &pos_L);
+       DrawPosLine(&fr_show, &pos_C, &pos_R);
+       DrawPosLine(&fr_show, &pos_L, &pos_R);
+     }
+     if (do_playback) {
+       fr_save = fr_show.clone();
+       cv::putText(fr_show, "playback", cv::Point(cap_size.width-250, 50), cv::FONT_HERSHEY_SIMPLEX, 1.5, cv::Scalar(0, 0, 255), 4.0, CV_AA);
+     }
+     imshow("frame", fr_show);
      
      //int time_w;
      //if (do_playback) time_w = 0;
@@ -249,6 +242,10 @@ int main(int argc, char** argv)
        cout << "Set the negative mode to '" << !do_negate << "'." << endl;
        do_negate = ! do_negate;
        break;
+     case 'A':
+       cout << "Set the save-as-is mode to '" << !save_as_is << "'." << endl;
+       save_as_is = ! save_as_is;
+       break;
      case 'P':
        cout << "Set the draw-point mode to '" << !draw_point << "'." << endl;
        draw_point = ! draw_point;
@@ -279,7 +276,7 @@ int main(int argc, char** argv)
        do_playback = false; // mode = DISPLAY;
        break;
      case 'm':
-       if (do_playback) SaveFrame(fn_base, idx_pb, &fr_show);
+       if (do_playback) SaveFrame(fn_base, idx_pb, save_as_is, &fr_save);
        break;
      case 'q':
        cout << "Quit." << endl;
@@ -373,18 +370,20 @@ void ChangePlaybackPos(bool& do_pb, int& idx_pb, int val)
   if (idx_new < 0     ) idx_new = 0;
   if (idx_new > n_fr-1) idx_new = n_fr-1;
   idx_pb = idx_new;
+  cout << "Playback: " << idx_pb+1 << " / " << buffer_frame.size() << endl;
 }
 
-void SaveFrame(const string bname, const int idx_pb, Mat* fr)
+void SaveFrame(const string bname, const int idx_pb, const bool save_as_is, Mat* fr)
 {
   FrameData* fd = &buffer_frame.at(idx_pb);
   ostringstream oss;
   oss << bname << "--" << setfill('0') << setw(6) << fd->fr << ".png";
   string fn_out = oss.str();
   cout << "  Save " << fn_out << endl;
-  imwrite(fn_out, fd->mat);
+  if (save_as_is && fr) imwrite(fn_out, *fr    );
+  else                  imwrite(fn_out, fd->mat);
 
-  if (fr) {
+  if (fr) { // This part does not work at present...
     ostringstream oss;
     oss << "Saved as " << fn_out << ".";
     cv::putText(*fr, oss.str(), cv::Point(10, 10), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1.0, CV_AA);
