@@ -101,9 +101,9 @@ int main(int argc, char** argv)
      cout << "  Not 'HD Webcam C615'?  The device setting might be improper.\n";
    }
    
-   SetControl(handle, CC_BRIGHTNESS    , 120);
+   SetControl(handle, CC_BRIGHTNESS    ,  96);
    SetControl(handle, CC_CONTRAST      ,  50);
-   SetControl(handle, CC_SATURATION    , 100);
+   SetControl(handle, CC_SATURATION    ,  72);
    SetControl(handle, CC_SHARPNESS     ,  50);
    SetControl(handle, CC_AUTO_FOCUS    ,   0);
    SetControl(handle, CC_FOCUS_ABSOLUTE, 102); // 119 for zoom=1, 85 for zoom=2
