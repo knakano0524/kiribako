@@ -251,7 +251,7 @@ int main(int argc, char** argv)
        draw_point = ! draw_point;
        break;
      case 'L':
-       cout << "Set the draw-line mode to '" << !draw_point << "'." << endl;
+       cout << "Set the draw-line mode to '" << !draw_line << "'." << endl;
        draw_line = ! draw_line;
        break;
      case 'c':
