@@ -160,7 +160,7 @@ int main(int argc, char** argv)
        char msg[256];
        sprintf(msg, "%s %06i", stime, i_fr);
        cv::putText (fr_show, msg, cv::Point(50,50), cv::FONT_HERSHEY_SIMPLEX, 1.5,
-                    cv::Scalar(100, 50, 50), 4.0, CV_AA);
+                    cv::Scalar(255, 0, 0), 4.0, CV_AA);
 
        buffer_frame.push_back(FrameData(i_fr, &fr_show));
        if (buffer_frame.size() > (unsigned)n_buf) buffer_frame.pop_front();
