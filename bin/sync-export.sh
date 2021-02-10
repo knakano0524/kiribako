@@ -4,7 +4,7 @@
 #   */10 *  * * *  $HOME/kiribako/bin/sync-export.sh &>/dev/null
 DIR_BASE=$(readlink -f $(dirname $0)/../)
 DIR_SRC=$DIR_BASE/export
-DIR_DST=hep4.nucl.phys.titech.ac.jp:/var/www/html/data/sync
+DIR_DST=jlab.phys.titech.ac.jp:/var/www/html/data/sync
 
 FN_ENA=$DIR_SRC/.sync-export.enabled
 FN_GRP=$DIR_SRC/.sync-export.conf
@@ -40,3 +40,5 @@ rsync --verbose --archive $DIR_SRC/ $DIR_DST
 
 ## Note: The trailing "/" on $DIR_SRC must be kept so that
 ## only the contents in $DIR_SRC (excluding the directory) are sync'ed.
+##
+## Note: The port and user for ssh in rsync should be given in ~/.ssh/config.
